@@ -10,6 +10,7 @@ import { GoogleProvider } from "./providers/google";
 import { MicrosoftProvider } from "./providers/microsoft";
 import { SpotifyProvider } from "./providers/spotify";
 import { MockProvider } from "./providers/mock";
+import { ShopifyProvider } from "./providers/shopify";
 
 const _providers = {
   github: GithubProvider,
@@ -28,8 +29,17 @@ const _getEnvForProvider = (provider: keyof typeof _providers) => {
   };
 };
 
-export async function getProvider(provider: ProjectsCrud['Admin']['Read']['config']['oauth_providers'][number]): Promise<OAuthBaseProvider> {
+export async function getProvider(
+  provider: ProjectsCrud['Admin']['Read']['config']['oauth_providers'][number],
+  options: {
+    shopifyShopId?: string,
+  }
+): Promise<OAuthBaseProvider> {
   if (provider.type === 'shared') {
+    if (provider.id === "shopify") {
+      throw new StackAssertionError("Shopify is not a shared provider");
+    }
+
     const clientId = _getEnvForProvider(provider.id).clientId;
     const clientSecret = _getEnvForProvider(provider.id).clientSecret;
     if (clientId === "MOCK") {
@@ -44,11 +54,21 @@ export async function getProvider(provider: ProjectsCrud['Admin']['Read']['confi
       });
     }
   } else {
-    return await _providers[provider.id].create({
-      clientId: provider.client_id || throwErr("Client ID is required for standard providers"),
-      clientSecret: provider.client_secret || throwErr("Client secret is required for standard providers"),
-      facebookConfigId: provider.facebook_config_id
-    });
+    const clientId = provider.client_id || throwErr("Client ID is required for Shopify provider");
+    const clientSecret = provider.client_secret || throwErr("Client secret is required for Shopify provider");
+    if (provider.id === 'shopify') {
+      return await ShopifyProvider.create({
+        shopId: options.shopifyShopId || throwErr("Shop ID is required for Shopify provider"),
+        clientId,
+        clientSecret,
+      });
+    } else {
+      return await _providers[provider.id].create({
+        clientId,
+        clientSecret,
+        facebookConfigId: provider.facebook_config_id
+      });
+    }
   }
 }
 

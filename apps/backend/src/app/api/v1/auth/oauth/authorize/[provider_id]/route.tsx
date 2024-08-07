@@ -32,6 +32,7 @@ export const GET = createSmartRouteHandler({
       provider_scope: yupString().optional(),
       error_redirect_url: urlSchema.optional(),
       after_callback_redirect_url: yupString().optional(),
+      shopify_shop_id: yupString().matches(/^[a-z0-9.-]+$/).optional().meta({ openapiField: { hidden: true } }),
 
       // oauth parameters
       client_id: yupString().required(),
@@ -66,6 +67,13 @@ export const GET = createSmartRouteHandler({
       throw new KnownErrors.OAuthProviderNotFoundOrNotEnabled();
     }
 
+    if (provider.id === "shopify" && !query.shopify_shop_id) {
+      throw new StatusError(StatusError.BadRequest, "Shopify shop ID is required for Shopify provider");
+    }
+    if (query.shopify_shop_id && provider.id !== "shopify") {
+      throw new StatusError(StatusError.BadRequest, "Shopify shop ID is only allowed for Shopify provider");
+    }
+
     // If the authorization token is present, we are adding new scopes to the user instead of sign-in/sign-up
     let projectUserId: string | undefined;
     if (query.type === "link") {
@@ -84,7 +92,7 @@ export const GET = createSmartRouteHandler({
 
     const innerCodeVerifier = generators.codeVerifier();
     const innerState = generators.state();
-    const providerObj = await getProvider(provider);
+    const providerObj = await getProvider(provider, { shopifyShopId: query.shopify_shop_id });
     const oauthUrl = providerObj.getAuthorizationUrl({
       codeVerifier: innerCodeVerifier,
       state: innerState,
@@ -110,6 +118,7 @@ export const GET = createSmartRouteHandler({
           providerScope: query.provider_scope,
           errorRedirectUrl: query.error_redirect_url,
           afterCallbackRedirectUrl: query.after_callback_redirect_url,
+          shopifyShopId: query.shopify_shop_id,
         } satisfies yup.InferType<typeof oauthCookieSchema>,
         expiresAt: new Date(Date.now() + 1000 * 60 * outerOAuthFlowExpirationInMinutes),
       },

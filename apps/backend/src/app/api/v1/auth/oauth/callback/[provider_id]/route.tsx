@@ -73,6 +73,7 @@ export const GET = createSmartRouteHandler({
       providerScope,
       errorRedirectUrl,
       afterCallbackRedirectUrl,
+      shopifyShopId,
     } = outerInfo;
 
     const project = await getProject(projectId);
@@ -90,7 +91,7 @@ export const GET = createSmartRouteHandler({
       throw new KnownErrors.OAuthProviderNotFoundOrNotEnabled();
     }
 
-    const providerObj = await getProvider(provider);
+    const providerObj = await getProvider(provider, { shopifyShopId });
     const { userInfo, tokenSet } = await providerObj.getCallback({
       codeVerifier: innerCodeVerifier,
       state: innerState,
@@ -204,6 +205,7 @@ export const GET = createSmartRouteHandler({
                   await prismaClient.projectUserOAuthAccount.create({
                     data: {
                       providerAccountId: userInfo.accountId,
+                      shopifyShopId,
                       email: userInfo.email,
                       providerConfig: {
                         connect: {

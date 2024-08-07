@@ -69,6 +69,9 @@ export const connectedAccountAccessTokenCrudHandlers = createLazyProxy(() =>crea
           projectUserId: userId,
         }
       },
+      include: {
+        projectUserOAuthAccount: true,
+      },
     });
 
     const filteredRefreshTokens = refreshTokens.filter((t) => {
@@ -79,7 +82,8 @@ export const connectedAccountAccessTokenCrudHandlers = createLazyProxy(() =>crea
       throw new KnownErrors.OAuthConnectionDoesNotHaveRequiredScope();
     }
 
-    const tokenSet = await (await getProvider(provider)).getAccessToken({
+    const shopifyShopId = filteredRefreshTokens[0].projectUserOAuthAccount.shopifyShopId ?? undefined;
+    const tokenSet = await (await getProvider(provider, { shopifyShopId })).getAccessToken({
       refreshToken: filteredRefreshTokens[0].refreshToken,
       scope: data.scope,
     });

@@ -22,6 +22,7 @@ function toTitle(id: string) {
     facebook: "Facebook",
     microsoft: "Microsoft",
     spotify: "Spotify",
+    shopify: "Shopify",
   }[id];
 }
 
