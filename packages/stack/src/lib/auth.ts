@@ -35,6 +35,7 @@ export async function addNewOAuthProviderOrScope(
     redirectUrl: string,
     errorRedirectUrl: string,
     providerScope?: string,
+    shopifyShopId?: string,
   },
   session: InternalSession,
 ) {
@@ -49,6 +50,7 @@ export async function addNewOAuthProviderOrScope(
     type: "link",
     session,
     providerScope: options.providerScope,
+    shopifyShopId: options.shopifyShopId,
   });
   window.location.assign(location);
   await neverResolve();

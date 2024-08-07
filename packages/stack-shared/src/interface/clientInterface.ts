@@ -700,6 +700,7 @@ export class StackClientInterface {
       state: string,
       type: "authenticate" | "link",
       providerScope?: string,
+      shopifyShopId?: string,
     } & ({ type: "authenticate" } | { type: "link", session: InternalSession })
   ): Promise<string> {
     const updatedRedirectUrl = new URL(options.redirectUrl);
@@ -729,6 +730,10 @@ export class StackClientInterface {
 
     if (options.afterCallbackRedirectUrl) {
       url.searchParams.set("after_callback_redirect_url", options.afterCallbackRedirectUrl);
+    }
+
+    if (options.shopifyShopId) {
+      url.searchParams.set("shopify_shop_id", options.shopifyShopId);
     }
 
     if (options.type === "link") {

@@ -306,8 +306,8 @@ class _StackClientAppImpl<HasTokenStore extends boolean, ProjectId extends strin
       return null;
     }
   );
-  private readonly _currentUserOAuthConnectionCache = createCacheBySession<[ProviderType, string, boolean], OAuthConnection | null>(
-    async (session, [providerId, scope, redirect]) => {
+  private readonly _currentUserOAuthConnectionCache = createCacheBySession<[ProviderType, string, boolean, string | undefined], OAuthConnection | null>(
+    async (session, [providerId, scope, redirect, shopifyShopId]) => {
       return await this._getUserOAuthConnectionCacheFn({
         getUser: async () => await this._currentUserCache.getOrWait([session], "write-only"),
         getOrWaitOAuthToken: async () => await this._currentUserOAuthConnectionAccessTokensCache.getOrWait([session, providerId, scope || ""], "write-only"),
@@ -316,6 +316,7 @@ class _StackClientAppImpl<HasTokenStore extends boolean, ProjectId extends strin
         scope,
         redirect,
         session,
+        shopifyShopId,
       });
     }
   );
@@ -326,6 +327,7 @@ class _StackClientAppImpl<HasTokenStore extends boolean, ProjectId extends strin
     useOAuthToken: () => { accessToken: string } | null,
     providerId: ProviderType,
     scope: string | null,
+    shopifyShopId?: string,
   } & ({ redirect: true, session: InternalSession | null } | { redirect: false }),) {
     const user = await options.getUser();
     let hasConnection = true;
@@ -349,6 +351,7 @@ class _StackClientAppImpl<HasTokenStore extends boolean, ProjectId extends strin
             redirectUrl: this.urls.oauthCallback,
             errorRedirectUrl: this.urls.error,
             providerScope: mergeScopeStrings(options.scope || "", (this._oauthScopesOnSignIn[options.providerId] ?? []).join(" ")),
+            shopifyShopId: options.shopifyShopId,
           },
           options.session,
         );
@@ -760,18 +763,20 @@ class _StackClientAppImpl<HasTokenStore extends boolean, ProjectId extends strin
 
   protected _createUserExtra(crud: CurrentUserCrud['Client']['Read'], session: InternalSession): UserExtra {
     const app = this;
+    async function getConnectedAccount(id: 'shopify', options: { or: 'redirect', scopes?: string[], shopifyShopId: string }): Promise<OAuthConnection>;
     async function getConnectedAccount(id: ProviderType, options?: { scopes?: string[] }): Promise<OAuthConnection | null>;
     async function getConnectedAccount(id: ProviderType, options: { or: 'redirect', scopes?: string[] }): Promise<OAuthConnection>;
-    async function getConnectedAccount(id: ProviderType, options?: { or?: 'redirect', scopes?: string[] }): Promise<OAuthConnection | null> {
+    async function getConnectedAccount(id: ProviderType, options?: { or?: 'redirect', scopes?: string[], shopifyShopId?: string }): Promise<OAuthConnection | null> {
       const scopeString = options?.scopes?.join(" ");
-      return await app._currentUserOAuthConnectionCache.getOrWait([session, id, scopeString || "", options?.or === 'redirect'], "write-only");
+      return await app._currentUserOAuthConnectionCache.getOrWait([session, id, scopeString || "", options?.or === 'redirect', options?.shopifyShopId], "write-only");
     }
 
+    function useConnectedAccount(id: 'shopify', options: { or: 'redirect', scopes?: string[], shopifyShopId: string }): OAuthConnection;
     function useConnectedAccount(id: ProviderType, options?: { scopes?: string[] }): OAuthConnection | null;
     function useConnectedAccount(id: ProviderType, options: { or: 'redirect', scopes?: string[] }): OAuthConnection;
-    function useConnectedAccount(id: ProviderType, options?: { or?: 'redirect', scopes?: string[] }): OAuthConnection | null {
+    function useConnectedAccount(id: ProviderType, options?: { or?: 'redirect', scopes?: string[], shopifyShopId?: string }): OAuthConnection | null {
       const scopeString = options?.scopes?.join(" ");
-      return useAsyncCache(app._currentUserOAuthConnectionCache, [session, id, scopeString || "", options?.or === 'redirect'], "user.useConnectedAccount()");
+      return useAsyncCache(app._currentUserOAuthConnectionCache, [session, id, scopeString || "", options?.or === 'redirect', options?.shopifyShopId], "user.useConnectedAccount()");
     }
 
     return {
@@ -1343,8 +1348,8 @@ class _StackServerAppImpl<HasTokenStore extends boolean, ProjectId extends strin
       return null;
     }
   );
-  private readonly _serverUserOAuthConnectionCache = createCache<[string, ProviderType, string, boolean], OAuthConnection | null>(
-    async ([userId, providerId, scope, redirect]) => {
+  private readonly _serverUserOAuthConnectionCache = createCache<[string, ProviderType, string, boolean, string | undefined], OAuthConnection | null>(
+    async ([userId, providerId, scope, redirect, shopifyShopId]) => {
       return await this._getUserOAuthConnectionCacheFn({
         getUser: async () => await this._serverUserCache.getOrWait([userId], "write-only"),
         getOrWaitOAuthToken: async () => await this._serverUserOAuthConnectionAccessTokensCache.getOrWait([userId, providerId, scope || ""], "write-only"),
@@ -1353,6 +1358,7 @@ class _StackServerAppImpl<HasTokenStore extends boolean, ProjectId extends strin
         scope,
         redirect,
         session: null,
+        shopifyShopId,
       });
     }
   );
@@ -1394,18 +1400,20 @@ class _StackServerAppImpl<HasTokenStore extends boolean, ProjectId extends strin
   protected _serverUserFromCrud(crud: UsersCrud['Server']['Read']): ServerUser {
     const app = this;
 
+    async function getConnectedAccount(id: 'shopify', options: { or: 'redirect', shopifyShopId: string, scopes?: string[] }): Promise<OAuthConnection>
     async function getConnectedAccount(id: ProviderType, options?: { scopes?: string[] }): Promise<OAuthConnection | null>;
     async function getConnectedAccount(id: ProviderType, options: { or: 'redirect', scopes?: string[] }): Promise<OAuthConnection>;
-    async function getConnectedAccount(id: ProviderType, options?: { or?: 'redirect', scopes?: string[] }): Promise<OAuthConnection | null> {
+    async function getConnectedAccount(id: ProviderType, options?: { or?: 'redirect', scopes?: string[], shopifyShopId?: string }): Promise<OAuthConnection | null> {
       const scopeString = options?.scopes?.join(" ");
-      return await app._serverUserOAuthConnectionCache.getOrWait([crud.id, id, scopeString || "", options?.or === 'redirect'], "write-only");
+      return await app._serverUserOAuthConnectionCache.getOrWait([crud.id, id, scopeString || "", options?.or === 'redirect', options?.shopifyShopId], "write-only");
     }
 
+    function useConnectedAccount(id: 'shopify', options: { or: 'redirect', shopifyShopId: string, scopes?: string[] }): OAuthConnection;
     function useConnectedAccount(id: ProviderType, options?: { scopes?: string[] }): OAuthConnection | null;
     function useConnectedAccount(id: ProviderType, options: { or: 'redirect', scopes?: string[] }): OAuthConnection;
-    function useConnectedAccount(id: ProviderType, options?: { or?: 'redirect', scopes?: string[] }): OAuthConnection | null {
+    function useConnectedAccount(id: ProviderType, options?: { or?: 'redirect', scopes?: string[], shopifyShopId?: string }): OAuthConnection | null {
       const scopeString = options?.scopes?.join(" ");
-      return useAsyncCache(app._serverUserOAuthConnectionCache, [crud.id, id, scopeString || "", options?.or === 'redirect'], "user.useConnectedAccount()");
+      return useAsyncCache(app._serverUserOAuthConnectionCache, [crud.id, id, scopeString || "", options?.or === 'redirect', options?.shopifyShopId], "user.useConnectedAccount()");
     }
 
     return {
@@ -2136,10 +2144,15 @@ type UserExtra = {
    */
   update(update: UserUpdateOptions): Promise<void>,
 
-  getConnectedAccount(id: ProviderType, options: { or: 'redirect', scopes?: string[] }): Promise<OAuthConnection>,
-  getConnectedAccount(id: ProviderType, options?: { or?: 'redirect' | 'throw' | 'return-null', scopes?: string[] }): Promise<OAuthConnection | null>,
-  useConnectedAccount(id: ProviderType, options: { or: 'redirect', scopes?: string[] }): OAuthConnection,
-  useConnectedAccount(id: ProviderType, options?: { or?: 'redirect' | 'throw' | 'return-null', scopes?: string[] }): OAuthConnection | null,
+  getConnectedAccount(id: "shopify", options: { or: 'redirect', scopes?: string[], shopifyShopId: string }): Promise<OAuthConnection>,
+  getConnectedAccount(id: "shopify", options: { scopes?: string[], shopifyShopId?: string }): Promise<OAuthConnection>,
+  getConnectedAccount(id: Exclude<ProviderType, 'shopify'>, options: { or: 'redirect', scopes?: string[] }): Promise<OAuthConnection>,
+  getConnectedAccount(id: Exclude<ProviderType, 'shopify'>, options?: { or?: 'redirect' | 'throw' | 'return-null', scopes?: string[] }): Promise<OAuthConnection | null>,
+
+  useConnectedAccount(id: "shopify", options: { or: 'redirect', scopes?: string[], shopifyShopId: string }): OAuthConnection,
+  useConnectedAccount(id: "shopify", options: { scopes?: string[], shopifyShopId?: string }): OAuthConnection,
+  useConnectedAccount(id: Exclude<ProviderType, 'shopify'>, options: { or: 'redirect', scopes?: string[] }): OAuthConnection,
+  useConnectedAccount(id: Exclude<ProviderType, 'shopify'>, options?: { or?: 'redirect' | 'throw' | 'return-null', scopes?: string[] }): OAuthConnection | null,
 
   hasPermission(scope: Team, permissionId: string): Promise<boolean>,
   setSelectedTeam(team: Team | null): Promise<void>,
