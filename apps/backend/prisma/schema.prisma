@@ -25,11 +25,12 @@ model Project {
   configOverride   ProjectConfigOverride?
   isProductionMode Boolean
 
-  users           ProjectUser[]    @relation("ProjectUsers")
-  teams           Team[]
-  apiKeySets      ApiKeySet[]
-  authMethods     AuthMethod[]
-  contactChannels ContactChannel[]
+  users             ProjectUser[]      @relation("ProjectUsers")
+  teams             Team[]
+  apiKeySets        ApiKeySet[]
+  authMethods       AuthMethod[]
+  contactChannels   ContactChannel[]
+  connectedAccounts ConnectedAccount[]
 }
 
 // Contains all the configuration for a project.
@@ -223,11 +224,19 @@ model ProjectUser {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project                       Project                        @relation("ProjectUsers", fields: [projectId], references: [id], onDelete: Cascade)
-  projectUserRefreshTokens      ProjectUserRefreshToken[]
-  projectUserAuthorizationCodes ProjectUserAuthorizationCode[]
-  projectUserOAuthAccounts      ProjectUserOAuthAccount[]
-  teamMembers                   TeamMember[]
+  // @deprecated
+  primaryEmail         String?
+  // @deprecated
+  primaryEmailVerified Boolean
+  profileImageUrl      String?
+  displayName          String?
+  // @deprecated
+  passwordHash         String?
+  // @deprecated
+  authWithEmail        Boolean
+
+  serverMetadata Json?
+  clientMetadata Json?
 
   // @deprecated
   projectUserEmailVerificationCode ProjectUserEmailVerificationCode[]
@@ -236,23 +245,20 @@ model ProjectUser {
   // @deprecated
   projectUserMagicLinkCode         ProjectUserMagicLinkCode[]
 
-  primaryEmail         String?
-  primaryEmailVerified Boolean
-  profileImageUrl      String?
-  displayName          String?
-  passwordHash         String?
-  authWithEmail        Boolean
-
-  serverMetadata  Json?
-  clientMetadata  Json?
-  contactChannels ContactChannel[]
-  authMethods     AuthMethod[]
+  project                       Project                        @relation("ProjectUsers", fields: [projectId], references: [id], onDelete: Cascade)
+  projectUserRefreshTokens      ProjectUserRefreshToken[]
+  projectUserAuthorizationCodes ProjectUserAuthorizationCode[]
+  projectUserOAuthAccounts      ProjectUserOAuthAccount[]
+  teamMembers                   TeamMember[]
+  contactChannels               ContactChannel[]
+  authMethods                   AuthMethod[]
+  connectedAccounts             ConnectedAccount[]
 
   @@id([projectId, projectUserId])
 }
 
 model ContactChannelConfig {
-  projectConfigId String
+  projectConfigId String @db.Uuid
   id              String @default(uuid()) @db.Uuid
 
   createdAt DateTime @default(now())
@@ -275,7 +281,7 @@ enum ContactChannelType {
 model ContactChannel {
   projectId              String
   id                     String @default(uuid()) @db.Uuid
-  projectConfigId        String
+  projectConfigId        String @db.Uuid
   contactChannelConfigId String @db.Uuid
   projectUserId          String @db.Uuid
 
@@ -289,16 +295,17 @@ model ContactChannel {
 
   type      ContactChannelType
   isPrimary BooleanTrue?
+  verified  Boolean
 
-  // email
-  email String
+  // email must be set for email type
+  email String?
 
   @@id([projectId, id])
   @@unique([projectId, projectUserId, isPrimary])
 }
 
 model ConnectedAccountConfig {
-  projectConfigId String
+  projectConfigId String @db.Uuid
   id              String @default(uuid()) @db.Uuid
 
   createdAt DateTime @default(now())
@@ -309,15 +316,38 @@ model ConnectedAccountConfig {
   // this should never be null
   oauthConfig OAuthProviderConfig?
 
-  projectConfig                      ProjectConfig @relation(fields: [projectConfigId], references: [id], onDelete: Cascade)
-  oAuthProviderConfigProjectConfigId String        @db.Uuid
-  oAuthProviderConfigId              String
+  projectConfig                      ProjectConfig      @relation(fields: [projectConfigId], references: [id], onDelete: Cascade)
+  oauthProviderConfigProjectConfigId String             @db.Uuid
+  oauthProviderConfigId              String
+  connectedAccounts                  ConnectedAccount[]
 
   @@id([projectConfigId, id])
 }
 
+model ConnectedAccount {
+  projectId                String
+  id                       String @default(uuid()) @db.Uuid
+  projectConfigId          String @db.Uuid
+  connectedAccountConfigId String @db.Uuid
+  projectUserId            String @db.Uuid
+  oauthProviderConfigId    String
+  oauthAccountId           String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  oauthAccount           ProjectUserOAuthAccount @relation(fields: [projectId, oauthProviderConfigId, oauthAccountId], references: [projectId, oauthProviderConfigId, providerAccountId])
+  project                Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectUser            ProjectUser             @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
+  connectedAccountConfig ConnectedAccountConfig  @relation(fields: [projectConfigId, connectedAccountConfigId], references: [projectConfigId, id], onDelete: Cascade)
+  oauthProviderConfig    OAuthProviderConfig     @relation(fields: [projectConfigId, oauthProviderConfigId], references: [projectConfigId, id], onDelete: Cascade)
+
+  @@id([projectId, id])
+  @@unique([projectId, oauthProviderConfigId, oauthAccountId])
+}
+
 model AuthMethodConfig {
-  projectConfigId String
+  projectConfigId String @db.Uuid
   id              String @default(uuid()) @db.Uuid
 
   createdAt DateTime @default(now())
@@ -390,6 +420,7 @@ model OAuthProviderConfig {
   // The config relation will never be unset, but might the enabled field might be set to false on authMethodConfig or connectedAccountConfig.
   authMethodConfig       AuthMethodConfig?       @relation(fields: [projectConfigId, authMethodConfigId], references: [projectConfigId, id], onDelete: Cascade)
   connectedAccountConfig ConnectedAccountConfig? @relation(fields: [projectConfigId, connectedAccountConfigId], references: [projectConfigId, id], onDelete: Cascade)
+  ConnectedAccount       ConnectedAccount[]
 
   @@id([projectConfigId, id])
   @@unique([projectConfigId, authMethodConfigId])
@@ -531,7 +562,8 @@ model ProjectUserOAuthAccount {
   oauthAccessToken OAuthAccessToken[]
 
   // This is used for the user to distinguish between multiple accounts from the same provider.
-  email String?
+  email            String?
+  connectedAccount ConnectedAccount?
 
   @@id([projectId, oauthProviderConfigId, providerAccountId])
 }
