@@ -57,6 +57,7 @@ model ProjectConfig {
   teamMemberDefaultSystemPermissions TeamSystemPermission[]
   authMethodConfigs                  AuthMethodConfig[]
   connectedAccountConfigs            ConnectedAccountConfig[]
+  contactChannelConfigs              ContactChannelConfig[]
 }
 
 model ProjectDomain {
@@ -242,12 +243,29 @@ model ProjectUser {
   passwordHash         String?
   authWithEmail        Boolean
 
-  serverMetadata Json?
-  clientMetadata Json?
-  ContactChannel ContactChannel[]
-  AuthMethod     AuthMethod[]
+  serverMetadata  Json?
+  clientMetadata  Json?
+  contactChannels ContactChannel[]
+  authMethods     AuthMethod[]
 
   @@id([projectId, projectUserId])
+}
+
+model ContactChannelConfig {
+  projectConfigId String
+  id              String @default(uuid()) @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enabled Boolean @default(true)
+
+  type ContactChannelType
+
+  projectConfig   ProjectConfig    @relation(fields: [projectConfigId], references: [id], onDelete: Cascade)
+  contactChannels ContactChannel[]
+
+  @@id([projectConfigId, id])
 }
 
 enum ContactChannelType {
@@ -255,22 +273,25 @@ enum ContactChannelType {
 }
 
 model ContactChannel {
-  projectId     String
-  id            String @default(uuid()) @db.Uuid
-  projectUserId String @db.Uuid
+  projectId              String
+  id                     String @default(uuid()) @db.Uuid
+  projectConfigId        String
+  contactChannelConfigId String @db.Uuid
+  projectUserId          String @db.Uuid
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectUser ProjectUser @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
+  project              Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectUser          ProjectUser          @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
+  contactChannelConfig ContactChannelConfig @relation(fields: [projectConfigId, contactChannelConfigId], references: [projectConfigId, id], onDelete: Cascade)
+  optAuthMethod        OptAuthMethod[]
 
   type      ContactChannelType
   isPrimary BooleanTrue?
 
   // email
-  email         String
-  optAuthMethod OptAuthMethod[]
+  email String
 
   @@id([projectId, id])
   @@unique([projectId, projectUserId, isPrimary])
@@ -304,6 +325,7 @@ model AuthMethodConfig {
 
   enabled Boolean @default(true)
 
+  // exactly one of xyzConfig should be set
   optConfig      OptAuthMethodConfig?
   oauthConfig    OAuthProviderConfig?
   passwordConfig PasswordAuthMethodConfig?
@@ -328,32 +350,6 @@ model OptAuthMethodConfig {
   @@id([projectConfigId, authMethodConfigId])
 }
 
-// Both the connected account and auth methods can use this configuration.
-// Exactly one of the xyzOAuthConfig variables should be set.
-model OAuthProviderConfig {
-  projectConfigId          String  @db.Uuid
-  authMethodConfigId       String? @db.Uuid
-  connectedAccountConfigId String? @db.Uuid
-  id                       String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  proxiedOAuthConfig  ProxiedOAuthProviderConfig?
-  standardOAuthConfig StandardOAuthProviderConfig?
-
-  projectConfig            ProjectConfig             @relation(fields: [projectConfigId], references: [id])
-  projectUserOAuthAccounts ProjectUserOAuthAccount[]
-
-  // At least one of authMethodConfig or connectedAccountConfig should be set.
-  authMethodConfig       AuthMethodConfig?       @relation(fields: [projectConfigId, authMethodConfigId], references: [projectConfigId, id], onDelete: Cascade)
-  connectedAccountConfig ConnectedAccountConfig? @relation(fields: [projectConfigId, connectedAccountConfigId], references: [projectConfigId, id], onDelete: Cascade)
-
-  @@id([projectConfigId, id])
-  @@unique([projectConfigId, authMethodConfigId])
-  @@unique([projectConfigId, connectedAccountConfigId])
-}
-
 enum PasswordAuthMethodType {
   EMAIL
   // USERNAME
@@ -373,6 +369,41 @@ model PasswordAuthMethodConfig {
   @@id([projectConfigId, authMethodConfigId])
 }
 
+// Both the connected account and auth methods can use this configuration.
+model OAuthProviderConfig {
+  projectConfigId          String  @db.Uuid
+  authMethodConfigId       String? @db.Uuid
+  connectedAccountConfigId String? @db.Uuid
+  id                       String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Exactly one of the xyzOAuthConfig variables should be set.
+  proxiedOAuthConfig  ProxiedOAuthProviderConfig?
+  standardOAuthConfig StandardOAuthProviderConfig?
+
+  projectConfig            ProjectConfig             @relation(fields: [projectConfigId], references: [id])
+  projectUserOAuthAccounts ProjectUserOAuthAccount[]
+
+  // At least one of authMethodConfig or connectedAccountConfig should be set.
+  // The config relation will never be unset, but might the enabled field might be set to false on authMethodConfig or connectedAccountConfig.
+  authMethodConfig       AuthMethodConfig?       @relation(fields: [projectConfigId, authMethodConfigId], references: [projectConfigId, id], onDelete: Cascade)
+  connectedAccountConfig ConnectedAccountConfig? @relation(fields: [projectConfigId, connectedAccountConfigId], references: [projectConfigId, id], onDelete: Cascade)
+
+  @@id([projectConfigId, id])
+  @@unique([projectConfigId, authMethodConfigId])
+  @@unique([projectConfigId, connectedAccountConfigId])
+}
+
+enum ProxiedOAuthProviderType {
+  GITHUB
+  FACEBOOK
+  GOOGLE
+  MICROSOFT
+  SPOTIFY
+}
+
 model ProxiedOAuthProviderConfig {
   projectConfigId String              @db.Uuid
   providerConfig  OAuthProviderConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id])
@@ -383,15 +414,35 @@ model ProxiedOAuthProviderConfig {
   type ProxiedOAuthProviderType
 
   @@id([projectConfigId, id])
+  // each type of proxied OAuth provider can only be used once per project
   @@unique([projectConfigId, type])
 }
 
-enum ProxiedOAuthProviderType {
+enum StandardOAuthProviderType {
   GITHUB
   FACEBOOK
   GOOGLE
   MICROSOFT
   SPOTIFY
+}
+
+model StandardOAuthProviderConfig {
+  projectConfigId String              @db.Uuid
+  providerConfig  OAuthProviderConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id])
+  id              String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  type         StandardOAuthProviderType
+  clientId     String
+  clientSecret String
+
+  // optional extra parameters for specific oauth providers
+  // Facebook business integration requires a config_id
+  facebookConfigId String?
+
+  // each standard oauth provider type can be used multiple times per project
+  @@id([projectConfigId, id])
 }
 
 model AuthMethod {
@@ -721,36 +772,6 @@ model StandardEmailServiceConfig {
   port        Int
   username    String
   password    String
-}
-
-//#endregion
-
-//#region OAuth
-
-model StandardOAuthProviderConfig {
-  projectConfigId String              @db.Uuid
-  providerConfig  OAuthProviderConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id])
-  id              String
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-
-  type         StandardOAuthProviderType
-  clientId     String
-  clientSecret String
-
-  // optional extra parameters for specific oauth providers
-  // Facebook business integration requires a config_id
-  facebookConfigId String?
-
-  @@id([projectConfigId, id])
-}
-
-enum StandardOAuthProviderType {
-  GITHUB
-  FACEBOOK
-  GOOGLE
-  MICROSOFT
-  SPOTIFY
 }
 
 //#endregion
