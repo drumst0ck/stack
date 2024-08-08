@@ -293,15 +293,16 @@ model ContactChannel {
   contactChannelConfig ContactChannelConfig @relation(fields: [projectConfigId, contactChannelConfigId], references: [projectConfigId, id], onDelete: Cascade)
   optAuthMethod        OptAuthMethod[]
 
-  type      ContactChannelType
-  isPrimary BooleanTrue?
-  verified  Boolean
-
-  // email must be set for email type
-  email String?
+  type       ContactChannelType
+  isPrimary  BooleanTrue?
+  verified   Boolean
+  identifier String
 
   @@id([projectId, id])
+  // each user can only have one primary contact channel
   @@unique([projectId, projectUserId, isPrimary])
+  // each identifier of a type can only apear once in a project
+  @@unique([projectId, type, identifier])
 }
 
 model ConnectedAccountConfig {
@@ -336,11 +337,12 @@ model ConnectedAccount {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  oauthAccount           ProjectUserOAuthAccount @relation(fields: [projectId, oauthProviderConfigId, oauthAccountId], references: [projectId, oauthProviderConfigId, providerAccountId])
-  project                Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectUser            ProjectUser             @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
-  connectedAccountConfig ConnectedAccountConfig  @relation(fields: [projectConfigId, connectedAccountConfigId], references: [projectConfigId, id], onDelete: Cascade)
-  oauthProviderConfig    OAuthProviderConfig     @relation(fields: [projectConfigId, oauthProviderConfigId], references: [projectConfigId, id], onDelete: Cascade)
+  oauthAccount ProjectUserOAuthAccount @relation(fields: [projectId, oauthProviderConfigId, oauthAccountId], references: [projectId, oauthProviderConfigId, providerAccountId])
+
+  project                Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectUser            ProjectUser            @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
+  connectedAccountConfig ConnectedAccountConfig @relation(fields: [projectConfigId, connectedAccountConfigId], references: [projectConfigId, id], onDelete: Cascade)
+  oauthProviderConfig    OAuthProviderConfig    @relation(fields: [projectConfigId, oauthProviderConfigId], references: [projectConfigId, id], onDelete: Cascade)
 
   @@id([projectId, id])
   @@unique([projectId, oauthProviderConfigId, oauthAccountId])
@@ -526,6 +528,7 @@ model PasswordAuthMethod {
   updatedAt DateTime @updatedAt
 
   type       PasswordAuthMethodType
+  // The identifier is the email or username, depending on the type.
   identifier String
 
   authMethod AuthMethod @relation(fields: [projectId, authMethodId], references: [projectId, id])
@@ -549,6 +552,7 @@ model OAuthAuthMethod {
   @@id([projectId, authMethodId])
 }
 
+// This should be renamed to "OAuthAccount" as it is not always bound to a user
 // When ever a user goes through the OAuth flow and gets an account ID from the OAuth provider, we store that here.
 model ProjectUserOAuthAccount {
   projectId             String
@@ -560,20 +564,21 @@ model ProjectUserOAuthAccount {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // This is used for the user to distinguish between multiple accounts from the same provider.
+  // we might want to add more user info here later
+  email String?
+
   providerConfig   OAuthProviderConfig @relation(fields: [projectConfigId, oauthProviderConfigId], references: [projectConfigId, id])
   // Before the OAuth account is connected to a use (for example, in the link oauth process), the projectUser is null.
   projectUser      ProjectUser?        @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
   oauthTokens      OAuthToken[]
   oauthAccessToken OAuthAccessToken[]
-
-  // This is used for the user to distinguish between multiple accounts from the same provider.
-  email            String?
   connectedAccount ConnectedAccount?
 
   @@id([projectId, oauthProviderConfigId, providerAccountId])
 }
 
-// This should be called "OAuthRefreshToken"
+// This should be renamed to "OAuthRefreshToken"
 model OAuthToken {
   id String @id @default(uuid()) @db.Uuid
 
