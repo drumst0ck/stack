@@ -55,9 +55,9 @@ model ProjectConfig {
 
   teamCreateDefaultSystemPermissions TeamSystemPermission[]
   teamMemberDefaultSystemPermissions TeamSystemPermission[]
-  AuthMethodConfig                   AuthMethodConfig[]
-  OptAuthMethodConfig                OptAuthMethodConfig[]
-  ConnectedAccountConfig             ConnectedAccountConfig[]
+  authMethodConfig                   AuthMethodConfig[]
+  optAuthMethodConfig                OptAuthMethodConfig[]
+  connectedAccountConfig             ConnectedAccountConfig[]
 }
 
 model ProjectDomain {
@@ -324,7 +324,7 @@ model OptAuthMethodConfig {
   authMethodConfig AuthMethodConfig @relation(fields: [projectConfigId, authMethodConfigId], references: [projectConfigId, id], onDelete: Cascade)
 
   contactChannelType ContactChannelType
-  ProjectConfig      ProjectConfig      @relation(fields: [projectConfigId], references: [id])
+  projectConfig      ProjectConfig      @relation(fields: [projectConfigId], references: [id])
 
   @@id([projectConfigId, authMethodConfigId])
 }
