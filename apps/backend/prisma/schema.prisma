@@ -402,9 +402,9 @@ model PasswordAuthMethodConfig {
 // Both the connected account and auth methods can use this configuration.
 model OAuthProviderConfig {
   projectConfigId          String  @db.Uuid
+  id                       String
   authMethodConfigId       String? @db.Uuid
   connectedAccountConfigId String? @db.Uuid
-  id                       String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -413,14 +413,14 @@ model OAuthProviderConfig {
   proxiedOAuthConfig  ProxiedOAuthProviderConfig?
   standardOAuthConfig StandardOAuthProviderConfig?
 
-  projectConfig            ProjectConfig             @relation(fields: [projectConfigId], references: [id])
-  projectUserOAuthAccounts ProjectUserOAuthAccount[]
-
   // At least one of authMethodConfig or connectedAccountConfig should be set.
   // The config relation will never be unset, but might the enabled field might be set to false on authMethodConfig or connectedAccountConfig.
   authMethodConfig       AuthMethodConfig?       @relation(fields: [projectConfigId, authMethodConfigId], references: [projectConfigId, id], onDelete: Cascade)
   connectedAccountConfig ConnectedAccountConfig? @relation(fields: [projectConfigId, connectedAccountConfigId], references: [projectConfigId, id], onDelete: Cascade)
-  connectedAccounts      ConnectedAccount[]
+
+  projectConfig            ProjectConfig             @relation(fields: [projectConfigId], references: [id])
+  projectUserOAuthAccounts ProjectUserOAuthAccount[]
+  connectedAccounts        ConnectedAccount[]
 
   @@id([projectConfigId, id])
   @@unique([projectConfigId, authMethodConfigId])
@@ -436,13 +436,15 @@ enum ProxiedOAuthProviderType {
 }
 
 model ProxiedOAuthProviderConfig {
-  projectConfigId String              @db.Uuid
-  providerConfig  OAuthProviderConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id])
+  projectConfigId String @db.Uuid
   id              String
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   type ProxiedOAuthProviderType
+
+  providerConfig OAuthProviderConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id])
 
   @@id([projectConfigId, id])
   // each type of proxied OAuth provider can only be used once per project
@@ -458,11 +460,11 @@ enum StandardOAuthProviderType {
 }
 
 model StandardOAuthProviderConfig {
-  projectConfigId String              @db.Uuid
-  providerConfig  OAuthProviderConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id])
+  projectConfigId String @db.Uuid
   id              String
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   type         StandardOAuthProviderType
   clientId     String
@@ -472,27 +474,30 @@ model StandardOAuthProviderConfig {
   // Facebook business integration requires a config_id
   facebookConfigId String?
 
+  providerConfig OAuthProviderConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id])
+
   // each standard oauth provider type can be used multiple times per project
   @@id([projectConfigId, id])
 }
 
 model AuthMethod {
-  authMethodId    String @default(uuid()) @db.Uuid
-  projectConfigId String @db.Uuid
   projectId       String
   id              String @default(uuid()) @db.Uuid
   projectUserId   String @db.Uuid
+  authMethodId    String @default(uuid()) @db.Uuid
+  projectConfigId String @db.Uuid
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // exactly one of the xyzAuthMethods should be set
+  optAuthMethods      OptAuthMethod?
+  passwordAuthMethods PasswordAuthMethod?
+  oauthAuthMethods    OAuthAuthMethod?
+
   project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectUser      ProjectUser      @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
   authMethodConfig AuthMethodConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id], onDelete: Cascade)
-
-  optAuthMethods      OptAuthMethod[]
-  passwordAuthMethods PasswordAuthMethod[]
-  oauthAuthMethods    OAuthAuthMethod[]
 
   @@id([projectId, id])
 }
