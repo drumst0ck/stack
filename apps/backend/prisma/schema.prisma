@@ -55,9 +55,8 @@ model ProjectConfig {
 
   teamCreateDefaultSystemPermissions TeamSystemPermission[]
   teamMemberDefaultSystemPermissions TeamSystemPermission[]
-  authMethodConfig                   AuthMethodConfig[]
-  optAuthMethodConfig                OptAuthMethodConfig[]
-  connectedAccountConfig             ConnectedAccountConfig[]
+  authMethodConfigs                  AuthMethodConfig[]
+  connectedAccountConfigs            ConnectedAccountConfig[]
 }
 
 model ProjectDomain {
@@ -274,7 +273,7 @@ model ContactChannel {
   optAuthMethod OptAuthMethod[]
 
   @@id([projectId, id])
-  @@unique([projectId, isPrimary])
+  @@unique([projectId, projectUserId, isPrimary])
 }
 
 model ConnectedAccountConfig {
@@ -310,6 +309,7 @@ model AuthMethodConfig {
   passwordConfig PasswordAuthMethodConfig?
 
   projectConfig ProjectConfig @relation(fields: [projectConfigId], references: [id], onDelete: Cascade)
+  authMethods   AuthMethod[]
 
   @@id([projectConfigId, id])
 }
@@ -321,10 +321,9 @@ model OptAuthMethodConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  authMethodConfig AuthMethodConfig @relation(fields: [projectConfigId, authMethodConfigId], references: [projectConfigId, id], onDelete: Cascade)
-
   contactChannelType ContactChannelType
-  projectConfig      ProjectConfig      @relation(fields: [projectConfigId], references: [id])
+
+  authMethodConfig AuthMethodConfig @relation(fields: [projectConfigId, authMethodConfigId], references: [projectConfigId, id], onDelete: Cascade)
 
   @@id([projectConfigId, authMethodConfigId])
 }
@@ -396,26 +395,28 @@ enum ProxiedOAuthProviderType {
 }
 
 model AuthMethod {
-  projectId     String
-  id            String @default(uuid()) @db.Uuid
-  projectUserId String @db.Uuid
+  authMethodId    String @default(uuid()) @db.Uuid
+  projectConfigId String @db.Uuid
+  projectId       String
+  id              String @default(uuid()) @db.Uuid
+  projectUserId   String @db.Uuid
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectUser ProjectUser @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectUser      ProjectUser      @relation(fields: [projectId, projectUserId], references: [projectId, projectUserId], onDelete: Cascade)
+  authMethodConfig AuthMethodConfig @relation(fields: [projectConfigId, id], references: [projectConfigId, id], onDelete: Cascade)
 
-  optAuthMethods     OptAuthMethod[]
-  passwordAuthMethod PasswordAuthMethod[]
-  oauthAuthMethod    OAuthAuthMethod[]
+  optAuthMethods      OptAuthMethod[]
+  passwordAuthMethods PasswordAuthMethod[]
+  oauthAuthMethods    OAuthAuthMethod[]
 
   @@id([projectId, id])
 }
 
 model OptAuthMethod {
   projectId        String
-  projectUserId    String @db.Uuid
   authMethodId     String @db.Uuid
   contactChannelId String @db.Uuid
 
@@ -431,7 +432,6 @@ model OptAuthMethod {
 
 model PasswordAuthMethod {
   projectId        String
-  projectUserId    String @db.Uuid
   authMethodId     String @db.Uuid
   contactChannelId String @db.Uuid
 
@@ -440,7 +440,8 @@ model PasswordAuthMethod {
 
   type       PasswordAuthMethodType
   identifier String
-  authMethod AuthMethod             @relation(fields: [projectId, authMethodId], references: [projectId, id])
+
+  authMethod AuthMethod @relation(fields: [projectId, authMethodId], references: [projectId, id])
 
   @@id([projectId, authMethodId])
   @@unique([projectId, identifier])
@@ -449,7 +450,6 @@ model PasswordAuthMethod {
 // This connects to projectUserOauthAccount, which might be shared between auth method and connected account.
 model OAuthAuthMethod {
   projectId        String
-  projectUserId    String @db.Uuid
   authMethodId     String @db.Uuid
   contactChannelId String @db.Uuid
 
