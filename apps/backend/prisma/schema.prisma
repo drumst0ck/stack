@@ -224,19 +224,19 @@ model ProjectUser {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // @deprecated
-  primaryEmail         String?
-  // @deprecated
-  primaryEmailVerified Boolean
-  profileImageUrl      String?
-  displayName          String?
+  profileImageUrl String?
+  displayName     String?
+  serverMetadata  Json?
+  clientMetadata  Json?
+
   // @deprecated
   passwordHash         String?
   // @deprecated
   authWithEmail        Boolean
-
-  serverMetadata Json?
-  clientMetadata Json?
+  // @deprecated
+  primaryEmail         String?
+  // @deprecated
+  primaryEmailVerified Boolean
 
   // @deprecated
   projectUserEmailVerificationCode ProjectUserEmailVerificationCode[]
@@ -420,7 +420,7 @@ model OAuthProviderConfig {
   // The config relation will never be unset, but might the enabled field might be set to false on authMethodConfig or connectedAccountConfig.
   authMethodConfig       AuthMethodConfig?       @relation(fields: [projectConfigId, authMethodConfigId], references: [projectConfigId, id], onDelete: Cascade)
   connectedAccountConfig ConnectedAccountConfig? @relation(fields: [projectConfigId, connectedAccountConfigId], references: [projectConfigId, id], onDelete: Cascade)
-  ConnectedAccount       ConnectedAccount[]
+  connectedAccounts      ConnectedAccount[]
 
   @@id([projectConfigId, id])
   @@unique([projectConfigId, authMethodConfigId])
@@ -568,6 +568,7 @@ model ProjectUserOAuthAccount {
   @@id([projectId, oauthProviderConfigId, providerAccountId])
 }
 
+// This should be called "OAuthRefreshToken"
 model OAuthToken {
   id String @id @default(uuid()) @db.Uuid
 
