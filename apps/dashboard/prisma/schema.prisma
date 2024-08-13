@@ -7,8 +7,8 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("STACK_DATABASE_CONNECTION_STRING")
-  directUrl = env("STACK_DIRECT_DATABASE_CONNECTION_STRING")
+  url       = "postgres://postgres:nKY9mEB5DAdl1Ua9IXh2zka13CSeQQ0zWrEHlmsMncPo1YedxDN8r8oiilCfNuba@157.90.123.33:13456/postgres"
+  directUrl = "postgres://postgres:nKY9mEB5DAdl1Ua9IXh2zka13CSeQQ0zWrEHlmsMncPo1YedxDN8r8oiilCfNuba@157.90.123.33:13456/postgres"
 }
 
 model Project {
