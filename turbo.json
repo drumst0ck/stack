@@ -21,36 +21,17 @@
         ".env.production",
         ".env.production.local"
       ],
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        ".next",
-        "dist/**",
-        "lib/**",
-        "*.js",
-        "*.d.ts",
-        "*.d.ts.map"
-      ],
+      "dependsOn": ["^build"],
+      "outputs": [".next", "dist/**", "lib/**", "*.js", "*.d.ts", "*.d.ts.map"],
       "outputLogs": "new-only"
     },
-    "@stackframe/docs#build": {
-      "dependsOn": [
-        "@stackframe/stack-backend#build"
-      ]
-    },
+
     "@stackframe/stack-backend#build": {
-      "dependsOn": [
-        "codegen"
-      ]
+      "dependsOn": ["codegen"]
     },
     "@stackframe/stack-backend#codegen": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        "../../docs/fern/openapi"
-      ]
+      "dependsOn": ["^build"],
+      "outputs": ["../../docs/fern/openapi"]
     },
     "clean": {
       "cache": false
